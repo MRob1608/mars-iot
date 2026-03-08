@@ -19,8 +19,10 @@ def normalize_sensor_reading(payload: dict[str, Any], source: str) -> dict[str, 
     Raises:
         ValueError: Se il formato del payload non è riconosciuto
     """
+    
+
     base = {
-        "id": payload.get("sensor_id") or payload.get("topic", ""),
+        "id": payload.get("sensor_id") or payload.get("topic", "").split('/')[-1],
         "source": source,
         "captured_at": payload.get("captured_at") or payload.get("event_time", ""),
         "status": payload.get("status", "ok"),
