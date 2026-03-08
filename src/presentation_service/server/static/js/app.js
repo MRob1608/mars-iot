@@ -1057,3 +1057,52 @@ function init() {
 
 window.addEventListener("DOMContentLoaded", init);
 
+
+////// 
+
+function closeRuleModal() {
+  document.getElementById("rule-modal").classList.add("hidden");
+  document.getElementById("rule-form").reset();
+}
+
+const ruleForm = document.getElementById("rule-form");
+
+ruleForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const data = {
+    //name: document.getElementById("rule-name").value,
+    sensor_name: document.getElementById("rule-sensor").value,
+    operator: document.getElementById("rule-operator").value,
+    threshold_value: parseFloat(document.getElementById("rule-threshold").value),
+    unit: scalarSensors.find(s => s.id === document.getElementById("rule-sensor").value)?.unit || "",
+    actuator_name: document.getElementById("rule-actuator").value,
+    actuator_state: document.getElementById("rule-actuator-state").value.toUpperCase(),
+    //priority: parseInt(document.getElementById("rule-priority").value),
+    enabled: document.getElementById("rule-enabled").checked
+  };
+
+  fetch("/add_rule", {
+    method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          console.log("Rule saved successfully");
+
+          closeRuleModal();
+
+          // loadRules(); // ricarica la tabella
+          // renderRules();
+
+          return;
+        } else {
+          console.error("Failed to save rule");
+        }
+      })
+});
+

@@ -1,2 +1,6 @@
 flask
 psycopg2-binary
+Flask-SocketIO  
+eventlet
+pika
+requests

@@ -1,6 +1,7 @@
 from flask import *
 from flask_socketio import SocketIO
 from db import *
+import requests
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -47,7 +48,7 @@ def add_rule():
         "action": "add",
         "topic": sensor_name
     }
-    response = request.post("http://automation-engine/update-rules", json=automation_data)
+    response = requests.post("http://automation-engine/update-rules", json=automation_data)
 
     if response.ok:
         return {'ok': True}
@@ -116,5 +117,5 @@ def get_rule():
 
 
 if __name__ == "__main__":
-    socketio.run(host="0.0.0.0", port=5050)
+    socketio.run(app, host="0.0.0.0", port=5050)
 
