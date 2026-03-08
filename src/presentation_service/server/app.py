@@ -1,7 +1,11 @@
-from flask import Flask, request, jsonify
+from flask import *
 from db import *
 
 app = Flask(__name__)
+
+@app.route("/") 
+def dashboard():
+    return render_template("index.html")
 
 @app.route("/rules", methods=["GET"])
 def get_rules():
@@ -31,7 +35,7 @@ def add_rule():
     enabled = data["enabled"]
     tuple = f"""'{sensor_name}', '{operator}', {threshold_value}, '{unit}', '{actuator_name}', '{actuator_state}', {enabled}"""
 
-    cur.execute(f"""insert into rules values ({tuple});""")
+    cur.execute(f"""insert into rules (sensor_name, operator, threshold_value, unit, actuator_name, actuator_state, enabled) values ({tuple});""")
     conn.commit()
 
     cur.close()
@@ -88,6 +92,5 @@ def delete_rule():
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5050)
 

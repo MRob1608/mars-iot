@@ -55,6 +55,8 @@ services:
   presentation-service:
     build:
       context: ./presentation_service
+    ports:
+      - "5050:5050"
     depends_on:
       - message-broker
       - ingestion-service
