@@ -7,12 +7,12 @@ services:
     networks:
       - mars-network
 
-  # 2. Message Broker (Esempio: ActiveMQ)
+  # 2. Message Broker (RabbitMQ - compatibile con pika/AMQP 0-9-1)
   message-broker:
-    image: rmohr/activemq:latest
+    image: rabbitmq:3-management
     ports:
-      - "61616:61616" # Porta per i client
-      - "8161:8161"   # Web console
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Web management UI
     networks:
       - mars-network
 
