@@ -118,6 +118,18 @@ def get_rule():
 
     return jsonify(rows)
 
+@app.route("/switch_actuator", methods=["POST"])
+def switch_actuator():
+    data = request.json
+    actuator = data["actuator"]
+    state = data["state"] # State deve essere "ON" o "OFF"
+
+    response = requests.post(f"http://mars-simulator:8080/api/actuators/{actuator}", json=state)
+
+    if response.ok:
+        socketio.emit("actuator_switch", {"state": state})
+        return {'ok': True}
+
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050)
