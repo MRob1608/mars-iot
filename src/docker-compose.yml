@@ -50,20 +50,13 @@ services:
     networks:
       - mars-network
 
-  api-gateway:
+  #6. Modulo Presentazione
+  presentation-service:
     build:
-      context: ./api-gateway
+      context: ./presentation-service
     depends_on:
       - message-broker
       - ingestion-service
-    networks:
-      - mars-network
-
-  dashboard:
-    build:
-      context: ./dashboard
-    depends_on:
-      - api-gateway
     networks:
       - mars-network
 
