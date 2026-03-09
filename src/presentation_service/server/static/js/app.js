@@ -371,7 +371,10 @@ function updateScalarSensorsUI() {
     statusEl.classList.add(status);
     statusEl.textContent = status.toUpperCase();
 
-    card.classList.toggle("critical", status === "critical");
+    card.classList.remove("warning", "critical");
+    if (status === "warning" || status === "critical") {
+      card.classList.add(status);
+    }
 
     // Update multi-metric values if present
     if (sensor.metrics && sensor.metrics.length && sensor.values) {
