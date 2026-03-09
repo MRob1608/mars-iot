@@ -65,6 +65,18 @@ services:
     networks:
       - mars-network
 
+  state:
+    build:
+      context: ./state
+    ports:
+      - "6001:6001"
+    #depends_on:
+    #  - message-broker
+    #  - ingestion-service
+    #  - mars-simulator
+    networks:
+      - mars-network
+
 volumes:
   postgres_data:
 
