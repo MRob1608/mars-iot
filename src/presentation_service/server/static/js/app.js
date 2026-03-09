@@ -100,7 +100,7 @@ const scalarSensors = [
   },
   {
     id: "air_quality_voc",
-    label: "VOC",
+    label: "Air Quality VOC",
     unit: "ppb",
     icon: "☣️",
     min: 0,
@@ -112,7 +112,7 @@ const scalarSensors = [
     value: null,
     metrics: [
       { key: "voc_ppb", label: "VOC ppb" },
-      { key: "voc_co2e_ppm", label: "CO₂eq ppm" },
+      { key: "co2e_ppm", label: "CO₂eq ppm" },
     ],
     values: {},
   },
@@ -127,8 +127,8 @@ const telemetryStreams = [
     label: "Solar Array",
     unit: "kW",
     color: "#47c3ff",
-    min: 120,
-    max: 140,
+    min: 100,
+    max: 150,
   },
   {
     id: "radiation",
@@ -177,8 +177,8 @@ const telemetryStreams = [
     label: "Power Consumption",
     unit: "kW",
     color: "#ffd86b",
-    min: 150,
-    max: 175,
+    min: 140,
+    max: 185,
   },
   {
     id: "airlock",
@@ -988,8 +988,10 @@ function handleRuleFormSubmit(event) {
 }
 
 function handleRuleUpdateClick() {
+  console.log("Update rule clicked");
   const modal = document.getElementById("rule-modal");
   const editingId = modal.dataset.editingRuleId || null;
+  console.log("Editing rule ID:", editingId);
   if (!editingId) return;
 
   const form = document.getElementById("rule-form");
@@ -1009,8 +1011,12 @@ function handleRuleUpdateClick() {
   const sensor = scalarSensors.find((s) => s.id === sensorId);
   const unit = sensor ? sensor.unit : "";
 
-  const rule = rules.find((r) => r.id === editingId);
-  if (!rule) return;
+  const rule = rules.find((r) => r.id === Number(editingId));
+  console.log("Rules:", rules);
+  if (!rule) {
+    console.log("Rule not found for update", editingId);
+    return;
+  }
 
   const payload = {
     id: rule.id,
