@@ -155,6 +155,17 @@ def switch_actuator():
     except requests.exceptions.RequestException as e:
         return jsonify({'ok': False, 'error': f"Connessione fallita: {e}"}), 503
 
+@app.route("/update_sensor", methods=["POST"])
+def update_sensor():
+    data = request.json
+    sensor = data.get("topic")
+    measurements = data.get("measurements")
+
+    if not sensor or not measurements:
+        return jsonify({"error": "Parametri 'sensor' o 'measurements' mancanti"}), 400
+
+    socketio.emit("sensor_update", {"sensor": sensor, "measurements": measurements})
+    return jsonify({'ok': True})
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050)
