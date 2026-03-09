@@ -62,19 +62,19 @@ IF <sensor_name> <operator> <value> THEN set <actuator_name> to <ON|OFF>
 * **As a** habitat operator
 * **I want to** see the list of actuators
 * **So that** I know which devices can be controlled.
-* **Mockup:** ![Mockup US-04](../booklets/mockup-us04.png)
+* **Mockup:** ![Mockup US-04](/booklets/actuators.png)
 
 #### US-05 – View actuator state
 * **As a** habitat operator
 * **I want to** see the current state of an actuator
 * **So that** I know whether it is ON or OFF.
-* **Mockup:** ![Mockup US-05](../booklets/mockup-us05.png)
+* **Mockup:** ![Mockup US-05](/booklets/actuators.png)
 
 #### US-06 – View system rules
 * **As a** habitat operator
 * **I want to** see the list of automation rules
 * **So that** I can review system automation.
-* **Mockup:** ![Mockup US-06](../booklets/mockup-us06.png)
+* **Mockup:** ![Mockup US-06](/booklets/rules.png)
 
 ### ---- RULE MANAGEMENT ----
 
@@ -82,25 +82,25 @@ IF <sensor_name> <operator> <value> THEN set <actuator_name> to <ON|OFF>
 * **As a** habitat operator
 * **I want to** create new automation rules
 * **So that** the system can automatically react to sensor values and interact with the environment.
-* **Mockup:** ![Mockup US-07](../booklets/mockup-us07.png)
+* **Mockup:** ![Mockup US-07](/booklets/rules.png)
 
 #### US-08 – Update rule
 * **As a** habitat operator
 * **I want to** update already existing automation rules
 * **So that** the system can respond to new conditions.
-* **Mockup:** ![Mockup US-08](../booklets/mockup-us08.png)
+* **Mockup:** ![Mockup US-08](/booklets/rules.png)
 
 #### US-09 – Delete rule
 * **As a** habitat operator
 * **I want to** delete an automation rule
 * **So that** I can remove outdated automation.
-* **Mockup:** ![Mockup US-09](../booklets/mockup-us09.png)
+* **Mockup:** ![Mockup US-09](/booklets/rules.png)
 
 #### US-10 – Disable and/or enable rule
 * **As a** habitat operator
 * **I want to** disable and/or enable an automation rule
 * **So that** I can handle in real time automation.
-* **Mockup:** ![Mockup US-10](../booklets/mockup-us10.png)
+* **Mockup:** ![Mockup US-10](/booklets/rules.png)
 
 ### ---- ACTUATOR MANAGEMENT ----
 
@@ -108,13 +108,13 @@ IF <sensor_name> <operator> <value> THEN set <actuator_name> to <ON|OFF>
 * **As a** habitat operator
 * **I want** the system to automatically activate actuators when rule conditions are met
 * **So that** environmental conditions are maintained.
-* **Mockup:** ![Mockup US-11](../booklets/mockup-us11.png)
+* **Mockup:** ![Mockup US-11](/booklets/actuators.png)
 
 #### US-12 – Manual Actuator control
 * **As a** habitat operator
 * **I want to** manually activate or deactivate an actuator
 * **So that** I can override automation when necessary.
-* **Mockup:** ![Mockup US-12](../booklets/mockup-us12.png)
+* **Mockup:** ![Mockup US-12](/booklets/actuators.png)
 
 ### ---- SYSTEM ALERTS, LOGS AND TELEMETRY ----
 
@@ -128,14 +128,12 @@ IF <sensor_name> <operator> <value> THEN set <actuator_name> to <ON|OFF>
 * **As a** habitat operator
 * **I want to** view a terminal or log showing the history of actuator state changes (both manual and rule-triggered)
 * **So that** I can trace system actions and audit the automation behavior.
-* **Mockup:** ![Mockup US-14](../booklets/mockup-us14.png)
+* **Mockup:** ![Mockup US-14](/booklets/actuators.png)
 
 #### US-15 – Persist automation rules
 * **As a** system operator
 * **I want** the automation rules to be persisted in a database
 * **So that** the habitat automation logic is preserved and restored automatically after a system reboot or failure.
-* **NFR:** Data must survive container restarts using persistent volumes.
-* **Mockup:** *(Nessun mockup UI stretto richiesto per la persistenza del backend, ma puoi inserire la schermata di ricaricamento regole o ignorare la voce mockup).*
 
 #### US-16 – View real-time telemetry trends
 * **As a** system operator
