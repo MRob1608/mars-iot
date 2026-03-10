@@ -720,19 +720,18 @@ select {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.65);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(90deg, #2a1f18, #231710);
+  background: linear-gradient(90deg, #2c1c12, #281818);
 }
 
 .actuator-terminal {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
   line-height: 1.5;
   padding: 10px 12px;
   max-height: 180px;
   overflow-y: auto;
-  background: radial-gradient(circle at top, #2e221b, #1b120d);
-  color: var(--accent-orange);
+  background: radial-gradient(circle at right, #1f1b16, #321308);
+  color: #e86b3a;
 }
 
 .actuator-terminal-line {
