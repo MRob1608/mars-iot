@@ -1,5 +1,5 @@
 """
-Normalizza i payload dei sensori REST e telemetria in uno schema unificato.
+Normalize REST and telemetry sensor payloads into a unified schema.
 """
 
 from typing import Any
@@ -7,17 +7,17 @@ from typing import Any
 
 def normalize_sensor_reading(payload: dict[str, Any], source: str) -> dict[str, Any]:
     """
-    Converte un payload grezzo (REST o telemetria) nello schema unificato.
+    Convert a raw payload (REST or telemetry) into the unified schema.
 
     Args:
-        payload: Dizionario con i dati del sensore
-        source: "rest" o "telemetry"
+        payload: Dictionary containing raw sensor data
+        source: "rest" or "telemetry"
 
     Returns:
-        Dizionario conforme allo schema UnifiedSensorReading
+        Dictionary matching the UnifiedSensorReading schema
 
     Raises:
-        ValueError: Se il formato del payload non è riconosciuto
+        ValueError: If the payload format is not recognized
     """
     
 
@@ -41,7 +41,7 @@ def normalize_sensor_reading(payload: dict[str, Any], source: str) -> dict[str, 
             ],
         }
 
-    # REST: rest.particulate.v1 (prima di chemistry per evitare match errato)
+    # REST: rest.particulate.v1 (before chemistry to avoid wrong match)
     if "pm1_ug_m3" in payload or "pm25_ug_m3" in payload or "pm10_ug_m3" in payload:
         return {
             **base,
@@ -65,7 +65,7 @@ def normalize_sensor_reading(payload: dict[str, Any], source: str) -> dict[str, 
     # REST: rest.chemistry.v1
     if "measurements" in payload and isinstance(payload["measurements"], list):
         measurements = payload["measurements"]
-        # Verifica che non sia topic.environment (ha "source" object)
+        # Ensure it is not topic.environment (that payload has a "source" object)
         if "source" not in payload or not isinstance(payload.get("source"), dict):
             return {
                 **base,
@@ -123,4 +123,4 @@ def normalize_sensor_reading(payload: dict[str, Any], source: str) -> dict[str, 
             },
         }
 
-    raise ValueError(f"Formato payload non riconosciuto: {list(payload.keys())}")
+    raise ValueError(f"Unrecognized payload format: {list(payload.keys())}")

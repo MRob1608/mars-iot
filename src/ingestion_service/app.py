@@ -7,7 +7,7 @@ from sseclient import SSEClient
 
 from sensor_normalizer import normalize_sensor_reading
 
-# --- Configurazione ---
+# --- Configuration ---
 GET_TOPICS = [
     "http://mars-simulator:8080/api/sensors/greenhouse_temperature",
     "http://mars-simulator:8080/api/sensors/entrance_humidity",
@@ -33,15 +33,15 @@ RABBITMQ_HOST = "message-broker"
 RABBITMQ_QUEUE = "telemetry_queue"
 EXCHANGE_NAME = 'exchange_data'
 
-# Lock per pubblicare su RabbitMQ (channel non è thread-safe)
+# Lock used to publish to RabbitMQ (channel is not thread-safe)
 _publish_lock = threading.Lock()
 
-# --- Funzione di normalizzazione allo schema unificato ---
+# --- Normalization helper to the unified schema ---
 def normalize_message(msg):
     """
-    Normalizza il payload (REST o telemetria) nello schema unificato.
-    La source viene inferita: se c'è "topic" è telemetry, altrimenti rest.
-    Aggiunge "topic" per il routing_key RabbitMQ (uguale a "id").
+    Normalize a REST or telemetry payload into the unified schema.
+    The source is inferred: if there is "topic" it is telemetry, otherwise rest.
+    Adds "topic" so it can be used as RabbitMQ routing_key (same as "id").
     """
     source = "telemetry" if "topic" in msg and "sensor_id" not in msg else "rest"
     try:
@@ -49,10 +49,10 @@ def normalize_message(msg):
         normalized["topic"] = normalized["id"]
         return normalized
     except ValueError as e:
-        print(f"Normalizzazione fallita, messaggio inalterato: {e}")
+        print(f"[INGEST][WARN] Normalization failed, message kept as is | error={e}")
         return msg
 
-# --- Funzione per creare una connessione persistente con RabbitMQ
+# --- Create a persistent RabbitMQ connection ---
 def create_connection():
     while True:
         try:
@@ -62,11 +62,11 @@ def create_connection():
             channel = connection.channel()
             channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic')
             return connection, channel
-        except pika.exceptions.AMQPConnectionError:
-            print("cannot create connection with broker")
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"[INGEST][ERROR] Cannot create connection with RabbitMQ, retrying in 5 seconds | error={e}")
             time.sleep(5)
 
-# --- Funzione per inviare messaggi a RabbitMQ ---
+# --- Send messages to RabbitMQ ---
 def send_to_rabbitmq(message, connection, channel):
     try:
         with _publish_lock:
@@ -75,15 +75,15 @@ def send_to_rabbitmq(message, connection, channel):
                 routing_key=message["topic"],
                 body=json.dumps(message),
                 properties=pika.BasicProperties(
-                    delivery_mode=2  # rende il messaggio persistente
+                    delivery_mode=2  # make the message persistent
                 )
             )
-        # Non chiudere la connessione: è condivisa tra i thread
-        print(f"Messaggio inviato a RabbitMQ: {message.get('topic', message.get('id', ''))}")
+        # Do not close the connection here: it is shared between threads
+        print(f"[INGEST][INFO] Message published to RabbitMQ | topic={message.get('topic', message.get('id', ''))}")
     except Exception as e:
-        print(f"Errore RabbitMQ: {e}")
+        print(f"[INGEST][ERROR] RabbitMQ publish failed | error={e}")
 
-# --- Thread per i topic SSE ---
+# --- SSE listener thread for telemetry topics ---
 def listen_sse(url, connection, channel):
     while True:
         try:
@@ -95,15 +95,15 @@ def listen_sse(url, connection, channel):
                     try:
                         data = json.loads(msg.data)
                         normalized = normalize_message(data)
-                        print(normalized)
+                        print(f"[INGEST][DEBUG] SSE message normalized | topic={normalized.get('topic')} | source={normalized.get('source')}")
                         send_to_rabbitmq(normalized, connection, channel)
                     except json.JSONDecodeError:
-                        print(f"Dati SSE non validi: {msg.data}")
+                        print(f"[INGEST][WARN] Invalid SSE payload, skipping message | url={url}")
         except Exception as e:
-            print(f"Errore SSE {url}: {e}")
-            time.sleep(5)  # ritenta dopo 5 secondi
+            print(f"[INGEST][ERROR] SSE stream error, retrying | url={url} | error={e}")
+            time.sleep(5)  # retry after 5 seconds
 
-# --- Thread per chiamate GET periodiche ---
+# --- Polling thread for periodic REST GET calls ---
 def poll_get(url, connection, channel, interval=5):
     while True:
         try:
@@ -111,32 +111,32 @@ def poll_get(url, connection, channel, interval=5):
             response.raise_for_status()
             data = response.json()
             normalized = normalize_message(data)
-            print(normalized)
+            print(f"[INGEST][DEBUG] REST payload normalized | topic={normalized.get('topic')} | source={normalized.get('source')}")
             send_to_rabbitmq(normalized, connection, channel)
         except requests.RequestException as e:
-            print(f"Errore GET {url}: {e}")
+            print(f"[INGEST][ERROR] REST GET failed | url={url} | error={e}")
         time.sleep(interval)
 
-# --- Main ---
+# --- Main entrypoint ---
 if __name__ == "__main__":
     connection, channel = create_connection()
     threads = []
 
-    # Avvia thread SSE
+    # Start SSE threads
     for sse_url in SSE_TOPICS:
         t = threading.Thread(target=listen_sse, args=(sse_url, connection, channel), daemon=True)
         t.start()
         threads.append(t)
 
-    # Avvia thread GET periodiche
+    # Start periodic GET threads
     for get_url in GET_TOPICS:
         t = threading.Thread(target=poll_get, args=(get_url, connection, channel), daemon=True)
         t.start()
         threads.append(t)
 
-    # Loop principale per tenere vivo il processo
+    # Main loop to keep the process alive
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Interrotto manualmente.")
+        print("[INGEST][INFO] Ingestion service interrupted manually")

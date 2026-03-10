@@ -9,22 +9,23 @@ import sys
 
 app = Flask(__name__)
 
-# --- Configurazione ---
+# --- Configuration ---
 RABBIT_HOST = 'message-broker'
 EXCHANGE_NAME = 'exchange_data'
 RULES_API_URL = "http://presentation-service:5050/get_rule"
 
+# Mapping of supported comparison operators
 OPERATORI_MAP = {
-    '>': operator.gt,   # Greater Than
-    '<': operator.lt,   # Less Than
-    '>=': operator.ge,  # Greater or Equal
-    '<=': operator.le,  # Less or Equal
+    '>': operator.gt,   # Greater than
+    '<': operator.lt,   # Less than
+    '>=': operator.ge,  # Greater or equal
+    '<=': operator.le,  # Less or equal
     '=': operator.eq,   # Equal
     '==': operator.eq,
-    '!=': operator.ne   # Not Equal
+    '!=': operator.ne   # Not equal
 }
 
-# Variabili globali per RabbitMQ
+# Global variables for RabbitMQ
 connection = None
 channel = None
 queue_name = None
@@ -50,28 +51,28 @@ def connect_rabbitmq():
 def sync_rules_on_startup():
     global connection, channel, queue_name
     """
-    Recupera tutte le regole attive dal backend e iscrive 
-    l'engine ai rispettivi topic su RabbitMQ.
+    Fetch all active rules from the backend and subscribe
+    the engine to the corresponding topics on RabbitMQ.
     """
-    print(" [*] Sincronizzazione regole in corso...")
+    print("[AUTOMATION][INFO] Synchronizing rules from backend...")
     try:
-        # Chiamata al backend per ottenere l'elenco completo dei topic
-        # Supponiamo che il backend esponga un endpoint GET /api/rules/topics
+        # Call the backend to obtain the full list of topics
+        # We assume the backend exposes a GET /api/rules/topics endpoint
         response = requests.get("http://presentation-service:5050/rules", timeout=10)
         response.raise_for_status()
         
-        raw_data = response.json()  
+        raw_data = response.json()
         
-        # Estrae i topic (colonna sensor_name) dal database (indice 2).
-        # Il set() serve a rimuovere i duplicati prima di convertirli di nuovo in una lista.
+        # Extract topics (sensor_name column) from the database (index 2).
+        # The set() removes duplicates before converting back to a list.
         topics = list(set([row[2] for row in raw_data if len(row) > 2]))
 
-        print(f"initial topics: {topics}", file=sys.stderr, flush=True)
+        print(f"[AUTOMATION][DEBUG] Initial topics list | topics={topics}", file=sys.stderr, flush=True)
         
         count = 0
         for topic in topics:
             if topic:
-                # Esegue il binding dinamico per ogni topic trovato
+                # Performs dynamic binding for each topic found
                 channel.queue_bind(
                     exchange=EXCHANGE_NAME, 
                     queue=queue_name, 
@@ -79,19 +80,19 @@ def sync_rules_on_startup():
                 )
                 count += 1
         
-        print(f" [V] Sincronizzazione completata: {count} topic registrati.")
+        print(f"[AUTOMATION][INFO] Rule synchronization completed | topics_registered={count}")
         
     except Exception as e:
-        print(f" [!] Errore durante la sincronizzazione iniziale: {e}")
-        # In un sistema reale, qui potresti decidere di far fallire l'avvio 
-        # o riprovare dopo qualche secondo.
+        print(f"[AUTOMATION][ERROR] Initial rule synchronization failed | error={e}")
+        # In a real system, you might abort startup or retry after some delay.
 
-# --- Logica di Automazione ---
+# --- Automation logic ---
 def process_message(ch, method, properties, body):
     data = json.loads(body)
     topic = data.get("topic")
     
-    print(f"\n---> [RICEVUTO] Topic: {topic} | Dati: {data}", file=sys.stderr, flush=True)
+    measurements = data.get("measurements", [])
+    print(f"[AUTOMATION][DEBUG] Message received | topic={topic} | measurements_count={len(measurements)}", file=sys.stderr, flush=True)
     
     try:
         response = requests.post(RULES_API_URL, json={"sensor_name": topic}, timeout=5)
@@ -100,103 +101,103 @@ def process_message(ch, method, properties, body):
             rules = response.json()
             
             if not rules:
-                print(f"---> [INFO] Nessuna regola per {topic}", file=sys.stderr, flush=True)
+                print(f"[AUTOMATION][INFO] No rules configured for topic | topic={topic}", file=sys.stderr, flush=True)
                 return
 
-            # --- NUOVA AGGIUNTA: Recupera lo stato attuale degli attuatori ---
-            # Nota: uso verify=False nel caso in cui il container non abbia certificati validi per l'HTTPS
+            # --- New block: retrieve current actuator states ---
+            # Note: verify=False is used in case the container does not have valid HTTPS certificates
             current_actuators = {}
             try:
                 actuators_resp = requests.get("http://mars-simulator:8080/api/actuators", timeout=5, verify=False)
                 if actuators_resp.status_code == 200:
-                    # Estrae il dizionario degli attuatori dal JSON {"actuators": {...}}
+                    # Extract actuator dictionary from JSON payload {"actuators": {...}}
                     current_actuators = actuators_resp.json().get("actuators", {})
                 else:
-                    print(f"---> [AVVISO] API attuatori ha risposto con {actuators_resp.status_code}", file=sys.stderr, flush=True)
+                    print(f"[AUTOMATION][WARN] Actuator API returned non-200 status | status={actuators_resp.status_code}", file=sys.stderr, flush=True)
             except requests.exceptions.RequestException as e:
-                print(f"---> [ERRORE RETE] API attuatori irraggiungibile: {e}", file=sys.stderr, flush=True)
+                print(f"[AUTOMATION][ERROR] Actuator API unreachable | error={e}", file=sys.stderr, flush=True)
             # -----------------------------------------------------------------
 
             for rule_row in rules:
-                # 🎯 Mappatura esatta sulla tua tabella SQL:
-                # 0:id, 1:name, 2:sensor_name, 3:operator, 4:threshold, 5:unit, 
+                # Exact mapping to the SQL rules table:
+                # 0:id, 1:name, 2:sensor_name, 3:operator, 4:threshold, 5:unit,
                 # 6:actuator_name, 7:actuator_state, 8:enabled, 9:created_at
 
                 rule_enabled = rule_row[8]
                 if not rule_enabled:
-                    continue # Salta subito le regole disattivate (geniale averlo nel DB!)
+                    continue  # Skip disabled rules immediately
 
-                rule_op_str = rule_row[3]            # es: ">"
-                rule_threshold = float(rule_row[4])  # es: 30.0
-                actuator_name = rule_row[6]          # es: "fan_01"
-                actuator_state = rule_row[7]         # es: "ON"
+                rule_op_str = rule_row[3]            # Example: ">"
+                rule_threshold = float(rule_row[4])  # Example: 30.0
+                actuator_name = rule_row[6]          # Example: "fan_01"
+                actuator_state = rule_row[7]         # Example: "ON"
                 
-                # --- NUOVA AGGIUNTA: Salta la regola se l'attuatore ha già lo stato desiderato ---
+                # --- New block: skip rule if actuator is already in the desired state ---
                 if current_actuators.get(actuator_name) == actuator_state:
-                    print(f"---> [SKIP] L'attuatore {actuator_name} è già su {actuator_state}.", file=sys.stderr, flush=True)
+                    print(f"[AUTOMATION][DEBUG] Skipping rule because actuator already in desired state | actuator={actuator_name} | state={actuator_state}", file=sys.stderr, flush=True)
                     continue
                 # ---------------------------------------------------------------------------------
 
-                # Prende la funzione matematica corrispondente all'operatore
+                # Get the mathematical function corresponding to the operator
                 op_func = OPERATORI_MAP.get(rule_op_str)
                 if not op_func:
-                    print(f"Operatore ignorato: {rule_op_str}", file=sys.stderr, flush=True)
+                    print(f"[AUTOMATION][WARN] Operator not supported, rule ignored | operator={rule_op_str}", file=sys.stderr, flush=True)
                     continue
                 
-                # Applica la regola ai dati ricevuti
+                # Apply the rule to the received data
                 for measure in data.get("measurements", []):
                     misurazione = float(measure.get("value", 0))
                     
-                    # MAGIA: valuta se (misurazione OPERATORE soglia) è vero.
-                    # Equivale a scrivere "if misurazione > rule_threshold:"
+                    # Evaluate if (measurement OP threshold) is true.
+                    # This is equivalent to writing for example "if value > rule_threshold:".
                     if op_func(misurazione, rule_threshold):
                         
-                        # --- ALLARME SCATTATO ---
-                        print(f"!!! REGOLA ATTIVATA per {topic} !!!", file=sys.stderr, flush=True)
-                        print(f"    Condizione verificata: {misurazione} {rule_op_str} {rule_threshold}", file=sys.stderr, flush=True)
-                        print(f"    -> AZIONE: Imposta {actuator_name} su {actuator_state}", file=sys.stderr, flush=True)
+                        # --- Alarm triggered ---
+                        print(f"[AUTOMATION][INFO] Rule triggered | topic={topic}", file=sys.stderr, flush=True)
+                        print(f"[AUTOMATION][DEBUG] Condition satisfied | value={misurazione} | operator={rule_op_str} | threshold={rule_threshold}", file=sys.stderr, flush=True)
+                        print(f"[AUTOMATION][DEBUG] Action dispatched | actuator={actuator_name} | target_state={actuator_state}", file=sys.stderr, flush=True)
                         
-                        # Se/quando avrai l'API per comandare gli attuatori reali:
+                        # When an API for real actuators is available, this will trigger it:
                         requests.post("http://presentation-service:5050/switch_actuator", json={"actuator": actuator_name, "state": actuator_state, "sender": "engine"})
 
         else:
-            print(f"---> [ERRORE API] Codice: {response.status_code}", file=sys.stderr, flush=True)
+            print(f"[AUTOMATION][ERROR] Rules API returned non-200 status | status={response.status_code}", file=sys.stderr, flush=True)
             
     except requests.exceptions.RequestException as e:
-        print(f"---> [ERRORE RETE] API irraggiungibile: {e}", file=sys.stderr, flush=True)
+        print(f"[AUTOMATION][ERROR] Rules API unreachable | error={e}", file=sys.stderr, flush=True)
 
 
 
-# --- Endpoint per il Backend (Aggiornamento Regole) ---
+# --- Backend endpoint (rules update) ---
 @app.route('/update-rules', methods=['POST'])
 def update_rules():
-    global connection, channel, queue_name # Usa la connessione globale
+    global connection, channel, queue_name  # Use the shared global connection
     
     update_info = request.json
     action = update_info.get("action")
     topic = update_info.get("topic")
 
-    # Creiamo due piccole funzioni che RabbitMQ eseguirà nel suo thread
+    # Small helper functions that RabbitMQ will run in its own thread
     def esegui_bind():
         channel.queue_bind(exchange=EXCHANGE_NAME, queue=queue_name, routing_key=topic)
-        print(f" [+] Iscritto al nuovo topic: {topic}")
+        print(f"[AUTOMATION][INFO] Subscribed to topic | topic={topic}")
 
     def esegui_unbind():
         channel.queue_unbind(exchange=EXCHANGE_NAME, queue=queue_name, routing_key=topic)
-        print(f" [-] Disiscritto dal topic: {topic}")
+        print(f"[AUTOMATION][INFO] Unsubscribed from topic | topic={topic}")
 
     try:
         if action == "add":
-            # Diciamo alla connessione di eseguire il bind in modo sicuro
+            # Ask the connection to safely schedule a bind operation
             connection.add_callback_threadsafe(esegui_bind)
         elif action == "remove":
-            # Diciamo alla connessione di eseguire l'unbind in modo sicuro
+            # Ask the connection to safely schedule an unbind operation
             connection.add_callback_threadsafe(esegui_unbind)
             
         return {"status": "updated"}, 200
         
     except Exception as e:
-        print(f" [!] Errore: {e}")
+        print(f"[AUTOMATION][ERROR] Failed to update routing rules | error={e}")
         return {"status": "error", "message": str(e)}, 500
 
 def start_rabbitmq():
@@ -208,8 +209,8 @@ if __name__ == "__main__":
 
     sync_rules_on_startup()
     
-    # Avvia RabbitMQ in un thread separato
+    # Start RabbitMQ in a dedicated thread
     threading.Thread(target=start_rabbitmq, daemon=True).start()
     
-    # Avvia il server Flask per ricevere aggiornamenti dal Backend
+    # Start the Flask server to receive updates from the backend
     app.run(host='0.0.0.0', port=6000)

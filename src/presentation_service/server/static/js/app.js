@@ -81,19 +81,19 @@ const scalarSensors = [
   },
   {
     id: "air_quality_pm25",
-    label: "PM2.5",
+    label: "Air Quality PM25",
     unit: "µg/m³",
     icon: "🌫️",
     min: 0,
     max: 200,
     warningLow: 0,
-    warningHigh: 8,
+    warningHigh: 10,
     criticalLow: 0,
-    criticalHigh: 10,
+    criticalHigh: 12,
     value: null,
     metrics: [
       { key: "pm1", label: "PM1" },
-      { key: "pm25", label: "PM2.5" },
+      { key: "pm25", label: "PM25" },
       { key: "pm10", label: "PM10" },
     ],
     values: {},
@@ -921,7 +921,7 @@ async function loadRules() {
 
 // Telemetry update & drawing
 
-// I valori telemetry sono ora aggiornati solo via websocket.
+// Telemetry values are now updated only via websocket.
 
 function drawTelemetryStream(stream, state) {
   const { canvas, ctx, points } = state;
@@ -1215,7 +1215,7 @@ function handleRuleFormSubmit(event) {
   const actuatorState = formData.get("actuatorState");
   const enabled = document.getElementById("rule-enabled").checked;
 
-  // Se stiamo editando, questo submit non fa nulla: l'update usa il pulsante dedicato.
+  // If we are editing, submit is a no-op: the dedicated update button handles it.
   if (editingId) {
     return;
   }
@@ -1260,10 +1260,8 @@ function handleRuleFormSubmit(event) {
 }
 
 function handleRuleUpdateClick() {
-  console.log("Update rule clicked");
   const modal = document.getElementById("rule-modal");
   const editingId = modal.dataset.editingRuleId || null;
-  console.log("Editing rule ID:", editingId);
   if (!editingId) return;
 
   const form = document.getElementById("rule-form");
@@ -1284,11 +1282,19 @@ function handleRuleUpdateClick() {
   const unit = sensor ? sensor.unit : "";
 
   const rule = rules.find((r) => r.id === Number(editingId));
-  console.log("Rules:", rules);
   if (!rule) {
-    console.log("Rule not found for update", editingId);
+    console.log("[FRONTEND][WARN] Rule not found for update", { ruleId: editingId });
     return;
   }
+
+  console.log("[FRONTEND][DEBUG] Updating rule", {
+    ruleId: rule.id,
+    sensorId,
+    actuatorId,
+    operator,
+    threshold,
+    enabled,
+  });
 
   const payload = {
     id: rule.id,
@@ -1365,13 +1371,26 @@ function startMissionClock() {
   let sol = 173;
 
   setInterval(() => {
+
     const now = new Date();
-    timeEl.textContent = formatTime(now);
-    // very rough: advance sol every few minutes in demo
-    if (now.getUTCMinutes() === 0 && now.getUTCSeconds() === 0) {
+
+    const italianTime = now.toLocaleTimeString("it-IT", {
+      timeZone: "Europe/Rome",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+
+    timeEl.textContent = italianTime;
+
+    const minutes = now.toLocaleString("it-IT", { timeZone: "Europe/Rome", minute: "numeric" });
+    const seconds = now.toLocaleString("it-IT", { timeZone: "Europe/Rome", second: "numeric" });
+
+    if (minutes === "0" && seconds === "0") {
       sol += 1;
       solEl.textContent = String(sol).padStart(4, "0");
     }
+
   }, 1000);
 }
 

@@ -58,8 +58,8 @@ def add_rule():
     if response.ok:
         return {'ok': True}
     else:
-        # Se l'engine fallisce, avvisa il frontend
-        return {'ok': False, 'error': 'Errore aggiornamento engine'}, 500
+        # If the engine fails, notify the frontend
+        return {'ok': False, 'error': 'Engine update error'}, 500
 
 @app.route("/update_rule", methods=["POST"])
 def update_rule():
@@ -133,22 +133,20 @@ def get_rule():
 
     return jsonify(rows)
 
-from flask import jsonify # Assicurati che sia importato in alto
 
-from flask import jsonify, request
 
 @app.route("/switch_actuator", methods=["POST"])
 def switch_actuator():
     data = request.json
     actuator = data.get("actuator")
-    state = data.get("state") # "ON" o "OFF"
+    state = data.get("state")  # "ON" or "OFF"
     sender = data.get("sender")
 
     if not actuator or not state:
-        return jsonify({"error": "Parametri 'actuator' o 'state' mancanti"}), 400
+        return jsonify({"error": "Missing 'actuator' or 'state' parameter"}), 400
 
     try:
-        # LA MODIFICA È QUI: passiamo un dizionario {"state": state}
+        # The change is here: send a dictionary {"state": state}
         payload = {"state": state}
         response = requests.post(
             f"http://mars-simulator:8080/api/actuators/{actuator}", 
@@ -157,15 +155,15 @@ def switch_actuator():
         )
 
         if response.ok:
-            # Notifichiamo il frontend, includendo quale attuatore è cambiato
+            # Notify the frontend, including which actuator changed
             socketio.emit("actuator_switch", {"actuator": actuator, "state": state, "sender": sender})
             return jsonify({'ok': True})
         else:
-            print(f"Errore dal simulatore: {response.text}", flush=True)
-            return jsonify({'ok': False, 'error': f"Errore {response.status_code}"}), response.status_code
+            print(f"[PRESENTATION][ERROR] Simulator actuator API returned non-200 status | status={response.status_code}", flush=True)
+            return jsonify({'ok': False, 'error': f"Simulator error {response.status_code}"}), response.status_code
 
     except requests.exceptions.RequestException as e:
-        return jsonify({'ok': False, 'error': f"Connessione fallita: {e}"}), 503
+        return jsonify({'ok': False, 'error': f"Connection to simulator failed: {e}"}), 503
 
 @app.route("/update_sensor", methods=["POST"])
 def update_sensor():
@@ -174,7 +172,7 @@ def update_sensor():
     measurements = data.get("measurements")
 
     if not sensor or not measurements:
-        return jsonify({"error": "Parametri 'sensor' o 'measurements' mancanti"}), 400
+        return jsonify({"error": "Missing 'sensor' or 'measurements' parameter"}), 400
 
     socketio.emit("sensor_update", {"sensor": sensor, "measurements": measurements})
     return jsonify({'ok': True})
@@ -184,17 +182,17 @@ def switch_sensor_state():
     data = request.json
     sensor = data.get("topic")
     state = data.get("state")
-    print(data)
+    print(f"[PRESENTATION][INFO] Sensor tracking change requested | sensor={sensor} | action={state}")
 
     if not sensor or not state:
-        return jsonify({"error": "Parametri 'sensor' o 'measurements' mancanti"}), 400
+        return jsonify({"error": "Missing 'sensor' or 'state' parameter"}), 400
 
     response = requests.post("http://report-service:3030/change_sensor_tracking", json={"action": state, "topic": sensor})
     if response.ok:
         return jsonify({'ok': True})
     else:
-            print(f"Errore dal simulatore: {response.text}", flush=True)
-            return jsonify({'ok': False, 'error': f"Errore {response.status_code}"}), response.status_code
+            print(f"[PRESENTATION][ERROR] Report-service tracking API returned non-200 status | status={response.status_code}", flush=True)
+            return jsonify({'ok': False, 'error': f"Report-service error {response.status_code}"}), response.status_code
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050)

@@ -5,55 +5,55 @@ import requests
 
 STATE= None
 
-# 1. PIPELINE DI CONNESSIONE (Stesso meccanismo di retry)
+# 1. CONNECTION PIPELINE (same retry mechanism)
 def connect_to_rabbitmq():
     while True:
         try:
             connection = pika.BlockingConnection(pika.ConnectionParameters('message-broker'))
-            print(" [V] Connesso a RabbitMQ!")
+            print("[STATE][INFO] Connected to RabbitMQ")
             return connection
         except pika.exceptions.AMQPConnectionError:
-            print(" [X] RabbitMQ non ancora pronto, riprovo in 3 secondi...")
+            print("[STATE][WARN] RabbitMQ not ready yet, retrying in 3 seconds...")
             time.sleep(3)
 
 
-# 3. PIPELINE DI CONSUMO (Callback)
+# 3. CONSUMPTION PIPELINE (callback)
 def callback(ch, method, properties, body):
     try:
-        # Quando arriva un messaggio, lo decodifichiamo
+        # Decode the incoming message payload
         data = json.loads(body)
-        print(body)
+        print(f"[STATE][DEBUG] Message received | topic={data.get('topic')} | measurements_count={len(data.get('measurements', []))}")
         
         response = requests.post(
             "http://presentation-service:5050/update_sensor", 
             json={"topic": data['topic'], "measurements": data['measurements']}
         )
         
-        # Opzionale: stampa di controllo per sapere che è andato tutto a buon fine
-        print(f"Messaggio inoltrato con status code: {response.status_code}")
+        # Optional: helpful print to know that forwarding succeeded
+        print(f"[STATE][INFO] Forwarded message to presentation-service | status_code={response.status_code}")
 
     except Exception as e:
-        # Cattura in un colpo solo qualsiasi errore e lo stampa
-        print(f"Si è verificato un errore durante l'elaborazione: {e}")
+        # Catch any processing error and log it
+        print(f"[STATE][ERROR] Error while processing message | error={e}")
 
 
 def create_state():
-    print(" [*] Attesa di masr-simulator...",flush=True)
+    print("[STATE][INFO] Waiting for mars-simulator to become available...", flush=True)
     
-    # 1. Ciclo di retry finché il simulatore non risponde
+    # 1. Retry loop until the simulator responds
     while True:
         try:
-            print("provo",flush=True)
+            print("[STATE][DEBUG] Probing mars-simulator endpoints...", flush=True)
             sensors_req = requests.get("http://mars-simulator:8080/api/sensors", timeout=5)
             telemetry_req = requests.get("http://mars-simulator:8080/api/telemetry/topics", timeout=5)
             actuators_req = requests.get("http://mars-simulator:8080/api/actuators", timeout=5)
             
-            # Assicuriamoci che tutte le risposte siano 200 OK prima di procedere
-            #sensors_req.raise_for_status()
-            #telemetry_req.raise_for_status()
-            #actuators_req.raise_for_status()
+            # Ensure all responses are 200 OK before proceeding
+            # sensors_req.raise_for_status()
+            # telemetry_req.raise_for_status()
+            # actuators_req.raise_for_status()
             
-            # Se siamo arrivati fin qui, significa che le chiamate sono andate a buon fine
+            # If we reach this point, all calls finished successfully
             sensors = sensors_req.json().get('sensors', [])
             
             telemetry = [
@@ -63,40 +63,40 @@ def create_state():
             
             actuators = list(actuators_req.json().get('actuators', {}).keys())
             
-            print(" [V] masr-simulator è pronto! Dati recuperati con successo.")
-            break  # Usciamo dal ciclo infinito
+            print("[STATE][INFO] mars-simulator is ready, data retrieved successfully")
+            break  # Exit the infinite loop
             
         except requests.exceptions.RequestException as e:
-            # Cattura errori di connessione, timeout, o errori HTTP (es. 500/404)
-            print(" [X] masr-simulator non ancora pronto, riprovo in 3 secondi...")
+            # Catch connection errors, timeouts, or HTTP errors (e.g. 500/404)
+            print("[STATE][WARN] mars-simulator not ready yet, retrying in 3 seconds...")
             time.sleep(3)
 
-    # 2. Creazione della variabile STATE
+    # 2. Create the STATE dictionary
     STATE = {
         **{sensor: 0 for sensor in sensors},
         **{tel: 0 for tel in telemetry},
         **{actuator: "OFF" for actuator in actuators}
     }
-    print(STATE)
+    print(f"[STATE][DEBUG] Initial state created | sensors={len(sensors)} | telemetry={len(telemetry)} | actuators={len(actuators)}")
 
     return STATE
 
 
 
 if __name__ == "__main__":
-    print("ciao", flush=True)
+    print("[STATE][INFO] Starting state service", flush=True)
     time.sleep(5)
     create_state()
-    print("state creato")
+    print("[STATE][INFO] Initial state created successfully")
 
     connection = connect_to_rabbitmq()
     channel = connection.channel()
 
-    # 2. PIPELINE DI DICHIARAZIONE E BINDING
+    # 2. DECLARATION AND BINDING PIPELINE
     exchange_name = 'exchange_data'
     channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
 
-    # Creiamo una coda unica per questo subscriber
+    # Create a unique queue for this subscriber
     result = channel.queue_declare(queue='', exclusive=True)
     queue_name = result.method.queue
 
@@ -106,9 +106,9 @@ if __name__ == "__main__":
     routing_key='#'
     )
 
-    print(f" [*] In attesa di messaggi di tutti i topic")
+    print("[STATE][INFO] Waiting for messages on all topics")
 
-    # Avviamo l'ascolto continuo
+    # Start continuous consuming
     channel.basic_consume(
         queue=queue_name, 
         on_message_callback=callback, 
@@ -118,6 +118,6 @@ if __name__ == "__main__":
     try:
         channel.start_consuming()
     except KeyboardInterrupt:
-        print(" [!] Chiusura subscriber...")
+        print("[STATE][INFO] Shutting down subscriber due to keyboard interrupt")
     finally:
         connection.close()

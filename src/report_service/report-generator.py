@@ -17,14 +17,14 @@ import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
-# --- Configurazione ---
-RABBIT_HOST = 'message-broker' # Assicurati che coincida con il nome servizio su docker-compose
+# --- Configuration ---
+RABBIT_HOST = 'message-broker'  # Must match the service name in docker-compose
 EXCHANGE_NAME = 'exchange_data'
 MAX_HISTORY = 20
 sensor_data_history = {}
 PDF_OUTPUT_DIR = "/app/reports"
 
-# Variabili globali per RabbitMQ
+# Global variables for RabbitMQ
 connection = None
 channel = None
 queue_name = None
@@ -37,7 +37,7 @@ def generate_pdf_report(topic, data_list):
     mean_val = statistics.mean(values)
     var_val = statistics.variance(values) if len(values) > 1 else 0.0
 
-    # --- Creazione isolata per Thread ---
+    # --- Thread-safe figure creation ---
     fig, ax = plt.subplots(figsize=(10, 6))
     
     label_text = f"Mean: {mean_val:.2f}\nVariance: {var_val:.2f}"
@@ -64,16 +64,16 @@ def generate_pdf_report(topic, data_list):
     filename = f"{topic}_report_{timestamp_file}.pdf"
     filepath = os.path.join(topic_dir, filename)
     
-    # Salva usando l'oggetto 'fig' specifico
+    # Save using the specific 'fig' object for this report
     fig.savefig(filepath, format='pdf', bbox_inches='tight')
-    plt.close(fig) # Chiude solo questa specifica figura
+    plt.close(fig)  # Close only this specific figure
 
     try:
         os.chmod(filepath, 0o777)
     except Exception:
         pass
     
-    print(f" [📄] PDF generated: {filepath} with {len(data_list)} real values.")
+    print(f"[REPORT][INFO] PDF generated | topic={topic} | file={filename} | values_count={len(data_list)}")
 
 def connect_rabbitmq():
     global channel, queue_name, connection
@@ -86,13 +86,13 @@ def connect_rabbitmq():
             channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic')
             result = channel.queue_declare(queue='', exclusive=True)
             queue_name = result.method.queue
-            print(" [x] Connesso a RabbitMQ con successo.")
+            print("[REPORT][INFO] Connected to RabbitMQ successfully")
             return channel
         except (pika.exceptions.AMQPConnectionError, socket.gaierror) as e:
-            print(" [!] Impossibile connettersi al broker. Riprovo in 2 secondi...")
+            print(f"[REPORT][WARN] RabbitMQ not available, retrying in 2 seconds | error={e}")
             time.sleep(2)
 
-# --- Logica di Automazione ---
+# --- Automation logic for reporting ---
 def process_message(ch, method, properties, body):
     global sensor_data_history
     try:
@@ -119,9 +119,9 @@ def process_message(ch, method, properties, body):
         
         sensor_data_history[topic].append(record)
         
-        # --- LOGICA DI THREADING ---
+        # --- Threading logic: offload PDF generation to a worker thread ---
         if len(sensor_data_history[topic]) >= MAX_HISTORY:
-            print(f" [*] Raggiunti {MAX_HISTORY} elementi per {topic}. Avvio worker in background...")
+            print(f"[REPORT][INFO] Spawning PDF worker | topic={topic} | history_size={MAX_HISTORY}")
             
             data_to_plot = list(sensor_data_history[topic])
             sensor_data_history[topic].clear()
@@ -134,11 +134,11 @@ def process_message(ch, method, properties, body):
             pdf_worker.start()
 
     except json.JSONDecodeError:
-        print(" [!] Errore: il messaggio ricevuto non è un JSON valido.")
+        print("[REPORT][ERROR] Invalid JSON payload received while processing message")
     except Exception as e:
-        print(f" [!] Errore nel processamento del messaggio: {e}")
+        print(f"[REPORT][ERROR] Unexpected error while processing message | error={e}")
 
-# --- Endpoint per il Backend ---
+# --- Backend endpoint (sensor tracking updates) ---
 @app.route('/change_sensor_tracking', methods=['POST'])
 def update_rules():
     global connection, channel, queue_name, sensor_data_history 
@@ -148,15 +148,15 @@ def update_rules():
     topic = update_info.get("topic")
 
     if not action or not topic:
-        return {"status": "error", "message": "Mancano action o topic"}, 400
+        return {"status": "error", "message": "Missing 'action' or 'topic' field"}, 400
 
     def esegui_bind():
         channel.queue_bind(exchange=EXCHANGE_NAME, queue=queue_name, routing_key=topic)
-        print(f" [+] Iscritto al nuovo topic: {topic}")
+        print(f"[REPORT][INFO] Subscribed to topic for reporting | topic={topic}")
 
     def esegui_unbind():
         channel.queue_unbind(exchange=EXCHANGE_NAME, queue=queue_name, routing_key=topic)
-        print(f" [-] Disiscritto dal topic: {topic}")
+        print(f"[REPORT][INFO] Unsubscribed from topic for reporting | topic={topic}")
 
     try:
         if action == "add":
@@ -169,12 +169,12 @@ def update_rules():
             connection.add_callback_threadsafe(esegui_unbind)
             
         else:
-            return {"status": "error", "message": "Azione non valida."}, 400
+            return {"status": "error", "message": "Invalid action value"}, 400
             
         return {"status": "updated"}, 200
         
     except Exception as e:
-        print(f" [!] Errore: {e}")
+        print(f"[REPORT][ERROR] Failed to update reporting rules | error={e}")
         return {"status": "error", "message": str(e)}, 500
 
 def start_rabbitmq():
@@ -184,8 +184,8 @@ def start_rabbitmq():
 if __name__ == "__main__":
     channel = connect_rabbitmq()
     
-    # Avvia RabbitMQ in un thread separato
+    # Start RabbitMQ in a dedicated thread
     threading.Thread(target=start_rabbitmq, daemon=True).start()
     
-    # Avvia il server Flask
+    # Start the Flask server
     app.run(host='0.0.0.0', port=3030)
