@@ -178,6 +178,19 @@ def update_sensor():
     socketio.emit("sensor_update", {"sensor": sensor, "measurements": measurements})
     return jsonify({'ok': True})
 
+@app.route("/switch_sensor_state", methods=["POST"])
+def switch_sensor_state():
+    data = request.json
+    sensor = data.get("topic")
+    state = data.get("state")
+
+    if not sensor or not state:
+        return jsonify({"error": "Parametri 'sensor' o 'measurements' mancanti"}), 400
+
+    response = requests.post("http://report-generator:3030/change_sensor_tracking", {"state": state, "topic": topic})
+    if response.ok:
+        return jsonify({'ok': True})
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050)
 

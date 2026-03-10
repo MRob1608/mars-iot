@@ -29,6 +29,9 @@
           <button class="nav-item" data-target="control-section">
             Control
           </button>
+          <button class="nav-item" data-target="sensors-section">
+            Sensors
+          </button>
           <button class="nav-item" data-target="automation-section">
             Automation
           </button>
@@ -56,7 +59,7 @@
             <p>Realtime monitoring • Control • Automation rules</p>
           </div>
           <div class="top-bar-status">
-            <div class="status-pill status-nominal">NOMINAL</div>
+            <div class="status-pill status-nominal" id="system-status">NOMINAL</div>
             <div class="status-pill status-radiation" id="radiation-pill">
               RAD: LOW
             </div>
@@ -88,6 +91,19 @@
             <div class="actuator-log-header">Actuator event log</div>
             <div id="actuator-log" class="actuator-terminal"></div>
           </div>
+        </section>
+
+        <section class="section" id="sensors-section">
+          <div class="section-header">
+            <h2>Sensors Tracking</h2>
+            <p>Enable or disable tracking for scalar and telemetry sensors</p>
+          </div>
+
+          <div class="section-subtitle">Scalar sensors</div>
+          <div id="sensor-tracking-grid" class="actuator-grid"></div>
+
+          <div class="section-subtitle">Telemetry streams</div>
+          <div id="telemetry-tracking-grid" class="actuator-grid"></div>
         </section>
 
         <section class="section" id="automation-section">

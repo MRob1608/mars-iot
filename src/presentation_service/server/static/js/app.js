@@ -234,6 +234,9 @@ const actuators = [
 const ACTUATOR_LOG_MAX_ENTRIES = 80;
 const actuatorLogEntries = [];
 
+// Tracking state for sensors/telemetry (frontend-only)
+const sensorTrackingState = {};
+
 let rules = [];
 
 // State for telemetry drawing
@@ -374,6 +377,18 @@ function updateScalarSensorsUI() {
     card.classList.remove("warning", "critical");
     if (status === "warning" || status === "critical") {
       card.classList.add(status);
+      // If any sensor is in warning or critical, set system status to warning or critical
+      const overallStatus = scalarSensors.some(s => evaluateStatus(s) === "critical") ? "CRITICAL" : "WARNING";
+      const systemStatus = document.getElementById("system-status");
+      systemStatus.textContent = overallStatus;
+    }
+    else {
+      // If all sensors are ok, set system status to nominal
+      const allOk = scalarSensors.every(s => evaluateStatus(s) === "ok");
+      if (allOk) {
+        const systemStatus = document.getElementById("system-status");
+        systemStatus.textContent = "NOMINAL";
+      }
     }
 
     // Update multi-metric values if present
@@ -598,6 +613,196 @@ function updateActuatorsUI() {
   }
 }
 
+function renderSensorTracking() {
+  const scalarGrid = document.getElementById("sensor-tracking-grid");
+  const telemetryGrid = document.getElementById("telemetry-tracking-grid");
+  if (!scalarGrid || !telemetryGrid) return;
+
+  scalarGrid.innerHTML = "";
+  telemetryGrid.innerHTML = "";
+
+  // Scalar sensors
+  for (const sensor of scalarSensors) {
+    const card = document.createElement("div");
+    card.className = "actuator-card";
+    card.dataset.sensorId = sensor.id;
+    card.dataset.trackingType = "scalar";
+
+    const header = document.createElement("div");
+    header.className = "actuator-header";
+
+    const title = document.createElement("div");
+    title.className = "actuator-title";
+
+    const icon = document.createElement("div");
+    icon.className = "actuator-icon";
+    icon.textContent = sensor.icon || "📡";
+
+    const labelWrap = document.createElement("div");
+    const label = document.createElement("div");
+    label.className = "actuator-label";
+    label.textContent = sensor.label;
+    const typeLabel = document.createElement("div");
+    typeLabel.className = "scalar-unit";
+    typeLabel.textContent = "SCALAR";
+    labelWrap.appendChild(label);
+    labelWrap.appendChild(typeLabel);
+
+    title.appendChild(icon);
+    title.appendChild(labelWrap);
+
+    header.appendChild(title);
+
+    const statusRow = document.createElement("div");
+    statusRow.className = "actuator-status-row";
+
+    const statusIndicator = document.createElement("div");
+    statusIndicator.className = "actuator-status-indicator";
+
+    const led = document.createElement("div");
+    led.className = "actuator-led off";
+    led.dataset.role = "sensor-led";
+
+    const stateText = document.createElement("div");
+    stateText.className = "actuator-state-text";
+    stateText.dataset.role = "sensor-state-text";
+
+    statusIndicator.appendChild(led);
+    statusIndicator.appendChild(stateText);
+
+    const toggle = document.createElement("div");
+    toggle.className = "actuator-toggle";
+    toggle.dataset.role = "sensor-toggle";
+
+    const knob = document.createElement("div");
+    knob.className = "actuator-knob";
+    toggle.appendChild(knob);
+
+    statusRow.appendChild(statusIndicator);
+    statusRow.appendChild(toggle);
+
+    const meta = document.createElement("div");
+    meta.className = "actuator-meta";
+    meta.dataset.role = "sensor-meta";
+
+    card.appendChild(header);
+    card.appendChild(statusRow);
+    card.appendChild(meta);
+
+    card.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleSensorTracking(sensor.id);
+    });
+
+    scalarGrid.appendChild(card);
+  }
+
+  // Telemetry sensors
+  for (const stream of telemetryStreams) {
+    const card = document.createElement("div");
+    card.className = "actuator-card";
+    card.dataset.sensorId = stream.sensorId;
+    card.dataset.trackingType = "telemetry";
+
+    const header = document.createElement("div");
+    header.className = "actuator-header";
+
+    const title = document.createElement("div");
+    title.className = "actuator-title";
+
+    const icon = document.createElement("div");
+    icon.className = "actuator-icon";
+    icon.textContent = "📈";
+
+    const labelWrap = document.createElement("div");
+    const label = document.createElement("div");
+    label.className = "actuator-label";
+    label.textContent = stream.label;
+    const typeLabel = document.createElement("div");
+    typeLabel.className = "scalar-unit";
+    typeLabel.textContent = "TELEMETRY";
+    labelWrap.appendChild(label);
+    labelWrap.appendChild(typeLabel);
+
+    title.appendChild(icon);
+    title.appendChild(labelWrap);
+
+    header.appendChild(title);
+
+    const statusRow = document.createElement("div");
+    statusRow.className = "actuator-status-row";
+
+    const statusIndicator = document.createElement("div");
+    statusIndicator.className = "actuator-status-indicator";
+
+    const led = document.createElement("div");
+    led.className = "actuator-led off";
+    led.dataset.role = "sensor-led";
+
+    const stateText = document.createElement("div");
+    stateText.className = "actuator-state-text";
+    stateText.dataset.role = "sensor-state-text";
+
+    statusIndicator.appendChild(led);
+    statusIndicator.appendChild(stateText);
+
+    const toggle = document.createElement("div");
+    toggle.className = "actuator-toggle";
+    toggle.dataset.role = "sensor-toggle";
+
+    const knob = document.createElement("div");
+    knob.className = "actuator-knob";
+    toggle.appendChild(knob);
+
+    statusRow.appendChild(statusIndicator);
+    statusRow.appendChild(toggle);
+
+    const meta = document.createElement("div");
+    meta.className = "actuator-meta";
+    meta.dataset.role = "sensor-meta";
+
+    card.appendChild(header);
+    card.appendChild(statusRow);
+    card.appendChild(meta);
+
+    card.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleSensorTracking(stream.sensorId);
+    });
+
+    telemetryGrid.appendChild(card);
+  }
+
+  updateSensorTrackingUI();
+}
+
+function updateSensorTrackingUI() {
+  const allCards = document.querySelectorAll(
+    '.actuator-card[data-sensor-id]'
+  );
+
+  allCards.forEach((card) => {
+    const sensorId = card.dataset.sensorId;
+    const enabled = !!sensorTrackingState[sensorId];
+
+    const led = card.querySelector('[data-role="sensor-led"]');
+    const stateText = card.querySelector('[data-role="sensor-state-text"]');
+    const toggle = card.querySelector('[data-role="sensor-toggle"]');
+    const meta = card.querySelector('[data-role="sensor-meta"]');
+
+    if (!led || !stateText || !toggle || !meta) return;
+
+    led.classList.toggle("on", enabled);
+    led.classList.toggle("off", !enabled);
+    toggle.classList.toggle("on", enabled);
+
+    stateText.textContent = enabled ? "TRACKING" : "IGNORED";
+    meta.textContent = enabled
+      ? "Sensor included in reporting"
+      : "Sensor excluded from reporting";
+  });
+}
+
 function renderRules() {
   const tbody = document.getElementById("rules-tbody");
   tbody.innerHTML = "";
@@ -807,6 +1012,32 @@ function toggleActuator(actuatorId) {
     })
     .catch((err) => {
       console.error("Error switching actuator", err);
+    });
+}
+
+function toggleSensorTracking(sensorId) {
+  const currentlyEnabled = !!sensorTrackingState[sensorId];
+  const nextEnabled = !currentlyEnabled;
+  const desiredState = nextEnabled ? "add" : "remove";
+
+  fetch("/switch_sensor_state", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ topic: sensorId, state: desiredState }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data.ok) {
+        console.error("Failed to switch sensor tracking", data);
+        return;
+      }
+      sensorTrackingState[sensorId] = nextEnabled;
+      updateSensorTrackingUI();
+    })
+    .catch((err) => {
+      console.error("Error switching sensor tracking", err);
     });
 }
 
@@ -1099,6 +1330,7 @@ function setupNav() {
   const sections = {
     "monitoring-section": document.getElementById("monitoring-section"),
     "control-section": document.getElementById("control-section"),
+    "sensors-section": document.getElementById("sensors-section"),
     "automation-section": document.getElementById("automation-section"),
   };
 
@@ -1118,6 +1350,9 @@ function setupNav() {
   // initial
   sections["monitoring-section"].style.display = "block";
   sections["control-section"].style.display = "block";
+  if (sections["sensors-section"]) {
+    sections["sensors-section"].style.display = "block";
+  }
   sections["automation-section"].style.display = "block";
 }
 
@@ -1208,6 +1443,7 @@ function init() {
   renderScalarSensors();
   renderTelemetryCards();
   renderActuators();
+  renderSensorTracking();
   populateRuleFormOptions();
   setupRuleModalEvents();
   setupNav();
